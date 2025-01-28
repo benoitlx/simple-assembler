@@ -1,29 +1,64 @@
 mod constants;
 mod tokenizer;
 
-use tokenizer::Token;
 use logos::Logos;
+use miette::{Diagnostic, NamedSource, SourceSpan};
+use std::env;
 use std::fs::File;
 use std::io::prelude::*;
-use std::env;
+use thiserror::Error;
+use tokenizer::Token;
 
-fn main() -> std::io::Result<()> {
-    let args: Vec<String> = env::args().collect();
+#[derive(Error, Debug, Diagnostic)]
+#[error("Unrecognized token")]
+#[diagnostic(code(oops), url("https://rezoleo.fr"), help("Try with A *A V *V or C for a register"))]
+pub struct TokenError {
+    #[source_code]
+    src: NamedSource<String>,
 
-    let mut file = File::open(&args[1])?;
+    #[label("problem here")]
+    bad_bit: SourceSpan,
+}
+
+#[derive(Error, Diagnostic, Debug)]
+pub enum TokenizerError {
+    #[error(transparent)]
+    #[diagnostic(code(tokernizer::io_error))]
+    IoError(#[from] std::io::Error),
+
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    TokenError(#[from] TokenError),
+}
+
+use miette::Result;
+fn tokenizer_app(args: std::env::Args) -> Result<(), TokenizerError> {
+    let args: Vec<String> = args.collect();
+
+    let filename: &str = &args[1];
+
+    let mut file = File::open(filename)?;
     let mut contents = String::new();
 
     file.read_to_string(&mut contents)?;
 
+    let mut lex = Token::lexer(contents.as_str());
 
-    let lex = Token::lexer(contents.as_str());
-
-    for result in lex {
+    while let Some(result) = lex.next() {
         match result {
             Ok(token) => println!("{:#?}", token),
-            Err(_) => panic!("Err occured"),
+            Err(_) => Err(TokenError {
+                src: NamedSource::new(filename, contents.clone()),
+                bad_bit: lex.span().into()
+            })?
         }
     }
+
+    Ok(())
+}
+
+fn main() -> Result<()> {
+    let _ = tokenizer_app(env::args())?;
 
     Ok(())
 }
