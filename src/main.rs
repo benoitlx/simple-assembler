@@ -1,35 +1,14 @@
 mod constants;
+mod error_handling;
 mod tokenizer;
 
+use error_handling::{TokenizerError, UnrecognizedToken};
 use logos::Logos;
-use miette::{Diagnostic, NamedSource, SourceSpan};
+use miette::NamedSource;
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
-use thiserror::Error;
 use tokenizer::Token;
-
-#[derive(Error, Debug, Diagnostic)]
-#[error("Unrecognized token")]
-#[diagnostic(code(oops), url("https://rezoleo.fr"), help("Try with A *A V *V or C for a register"))]
-pub struct TokenError {
-    #[source_code]
-    src: NamedSource<String>,
-
-    #[label("problem here")]
-    bad_bit: SourceSpan,
-}
-
-#[derive(Error, Diagnostic, Debug)]
-pub enum TokenizerError {
-    #[error(transparent)]
-    #[diagnostic(code(tokernizer::io_error))]
-    IoError(#[from] std::io::Error),
-
-    #[error(transparent)]
-    #[diagnostic(transparent)]
-    TokenError(#[from] TokenError),
-}
 
 use miette::Result;
 fn tokenizer_app(args: std::env::Args) -> Result<(), TokenizerError> {
@@ -47,10 +26,10 @@ fn tokenizer_app(args: std::env::Args) -> Result<(), TokenizerError> {
     while let Some(result) = lex.next() {
         match result {
             Ok(token) => println!("{:#?}", token),
-            Err(_) => Err(TokenError {
+            Err(_) => Err(UnrecognizedToken{
                 src: NamedSource::new(filename, contents.clone()),
-                bad_bit: lex.span().into()
-            })?
+                src_span: lex.span().into(),
+            })?,
         }
     }
 
