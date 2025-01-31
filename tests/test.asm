@@ -1,10 +1,9 @@
-A <-- 1 + C
-A <- 256
-*A <- C
-A >= 3
-A
-D
+0x8000
+A <- A majhkdf & 3
+V <- V + 1
 
-thisis_a_label:
 
-0x333
+main:
+0x033
+
+main:
