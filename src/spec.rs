@@ -1,6 +1,6 @@
 pub mod arch_v1 {
-    use logos::Lexer;
     use crate::lexer::HandleToken;
+    use logos::Lexer;
 
     #[allow(dead_code)]
 
@@ -29,7 +29,7 @@ pub mod arch_v1 {
                 "=" => Some(Op::Assignement),
                 _ => None, // todo: return a beautiful error
             }
-        } 
+        }
 
         fn bit_stream(&self) -> String {
             todo!();
@@ -55,7 +55,7 @@ pub mod arch_v1 {
                 "D" => Some(Reg::D),
                 _ => None, // todo: return a beautiful error
             }
-        } 
+        }
 
         fn bit_stream(&self) -> String {
             match self {
@@ -82,17 +82,19 @@ pub mod arch_v1 {
 
     impl HandleToken for Cond {
         fn new(lex: &mut Lexer<crate::lexer::Token>) -> Option<Self>
-            where Self: Sized {
-                match lex.slice() {
-                    "==" => Some(Cond::Eq),
-                    ">" => Some(Cond::Gt),
-                    "<" => Some(Cond::Lt),
-                    ">=" => Some(Cond::GtEq),
-                    "<=" => Some(Cond::LtEq),
-                    "!=" => Some(Cond::Neq),
-                    "JMP" => Some(Cond::Jump),
-                    _ => None // todo error
-                }
+        where
+            Self: Sized,
+        {
+            match lex.slice() {
+                "==" => Some(Cond::Eq),
+                ">" => Some(Cond::Gt),
+                "<" => Some(Cond::Lt),
+                ">=" => Some(Cond::GtEq),
+                "<=" => Some(Cond::LtEq),
+                "!=" => Some(Cond::Neq),
+                "JMP" => Some(Cond::Jump),
+                _ => None, // todo error
+            }
         }
 
         fn bit_stream(&self) -> String {
