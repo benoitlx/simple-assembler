@@ -19,6 +19,7 @@ pub trait HandleToken {
 pub enum Token {
 
     // watchout you need to escape the good char
+    // tested
     #[regex(r"[\+&=\-|^~]", Op::new)]
     Operation(Op),
 
@@ -42,6 +43,7 @@ pub enum Token {
     Directive(Dir),
 
     // Register has a higher priority than Identifier
+    // tested
     #[regex(r"\*?[A-Z]", Reg::new, priority = 2)]
     Register(Reg),
     // No test
@@ -88,6 +90,41 @@ mod tests {
         let mut lex = Token::lexer("A +A\n");
         lex.next();
         assert_eq!(lex.next(), Some(Ok(Token::Operation(Op::Add))));
+    }
+
+    #[test]
+    fn test_register() {
+        let mut lex = Token::lexer("A V D *A *V");
+        assert_eq!(lex.next(), Some(Ok(Token::Register(Reg::A))));
+        assert_eq!(lex.next(), Some(Ok(Token::Register(Reg::V))));
+        assert_eq!(lex.next(), Some(Ok(Token::Register(Reg::D))));
+        assert_eq!(lex.next(), Some(Ok(Token::Register(Reg::AStar))));
+        assert_eq!(lex.next(), Some(Ok(Token::Register(Reg::VStar))));
+
+        let mut lex = Token::lexer("A=");
+        assert_eq!(lex.next(), Some(Ok(Token::Register(Reg::A))));
+
+        let mut lex = Token::lexer("A\n");
+        assert_eq!(lex.next(), Some(Ok(Token::Register(Reg::A))));
+
+        // the wrong syntax below will be catch by the parser
+        let mut lex = Token::lexer("A:");
+        assert_eq!(lex.next(), Some(Ok(Token::Register(Reg::A))));
+
+        // the wrong syntax below will be catch by the parser
+        let mut lex = Token::lexer("DEFINE A");
+        lex.next();
+        assert_eq!(lex.next(), Some(Ok(Token::Register(Reg::A))));
+
+        // the wrong syntax below will be catch by the parser
+        let mut lex = Token::lexer("DEFINE *A");
+        lex.next();
+        assert_eq!(lex.next(), Some(Ok(Token::Register(Reg::AStar))));
+
+        // Register B doesn't exist 
+        // TODO: return a specific error with helper including the list of valid registers
+        let mut lex = Token::lexer("B");
+        assert_eq!(lex.next(), Some(Err(())));
     }
 
 }
