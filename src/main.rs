@@ -1,4 +1,3 @@
-mod constants;
 mod lexer;
 
 use lexer::Token;

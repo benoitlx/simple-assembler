@@ -1,5 +1,19 @@
 use logos::{Lexer, Logos};
 
+/* >> Architecture being used << */
+#[path ="spec.rs"]
+mod spec;
+use spec::arch_v1::*;
+
+/// This trait is either used by the lexer to produce Token with the new method
+/// or by the parser to generate the bit stream from a Token
+pub trait HandleToken {
+    fn bit_stream(&self) -> String; // get the bit stream from an item (Reg, Op, Inst)
+
+    fn new(lex: &mut Lexer<Token>) -> Option<Self>
+    where Self: Sized; // todo: default implementation qui renvoit une erreur en spécifiant le type Self
+}
+
 #[derive(Logos, Debug, PartialEq)]
 #[logos(skip r"\s+")]
 pub enum Token {
@@ -29,59 +43,6 @@ pub enum Token {
 
     #[regex(r"\s?;.*")]
     Comment,
-}
-
-#[derive(Debug, PartialEq)]
-pub enum Op {
-    Add,
-    Sub,
-    And,
-    Assignement,
-}
-
-impl Op {
-    fn new(lex: &mut Lexer<Token>) -> Option<Op> {
-        match lex.slice().trim() {
-            "+" => Some(Op::Add),
-            "-" => Some(Op::Sub),
-            "&" => Some(Op::And),
-            "=" => Some(Op::Assignement),
-            _ => None, // todo: return a beautiful error
-        }
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub enum Reg {
-    A,
-    V,
-    AStar,
-    VStar,
-    D,
-}
-
-impl Reg {
-    fn new(lex: &mut Lexer<Token>) -> Option<Reg> {
-        match lex.slice() {
-            "A" => Some(Reg::A),
-            "V" => Some(Reg::V),
-            "*A" => Some(Reg::AStar),
-            "*V" => Some(Reg::VStar),
-            "D" => Some(Reg::D),
-            _ => None, // todo: return a beautiful error
-        }
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub enum Cond {
-    Eq,
-    Neq,
-}
-
-#[derive(Debug, PartialEq)]
-pub enum Inst {
-    Jump,
 }
 
 #[derive(Debug, PartialEq)]
