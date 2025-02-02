@@ -10,8 +10,8 @@ pub enum Token {
     Condition(Cond),
 
     #[regex(r"[0-9]+", |_| 3, priority = 6)]
-    #[regex("(0x|0X){1}[a-fA-F0-9]+", |_| 3, priority = 6)] 
-    #[regex("(0b|0B){1}(0|1)+", |_| 3, priority = 6)] 
+    #[regex("(0x|0X){1}[a-fA-F0-9]+", |_| 3, priority = 6)]
+    #[regex("(0b|0B){1}(0|1)+", |_| 3, priority = 6)]
     Value(u16),
 
     #[token("JMP", |_| Inst::Jump, priority = 5)]
@@ -21,11 +21,7 @@ pub enum Token {
     #[token("DEFINE", |_| Dir::Define, priority = 4)]
     Directive(Dir),
 
-    #[token("A", |_| Reg::A, priority = 3)]
-    #[token("*A", |_| Reg::AStar, priority = 3)]
-    #[token("V", |_| Reg::V, priority = 3)]
-    #[token("*V", |_| Reg::VStar, priority = 3)]
-    #[token("D", |_| Reg::D, priority = 3)]
+    #[regex(r"\*?[A-Z]{1}", Reg::new, priority = 3)]
     Register(Reg),
 
     #[regex(r"[a-zA-Z_]+", |lex| lex.slice().to_string(), priority = 1)]
@@ -50,7 +46,7 @@ impl Op {
             "-" => Some(Op::Sub),
             "&" => Some(Op::And),
             "=" => Some(Op::Assignement),
-            _ => None
+            _ => None, // todo: return a beautiful error
         }
     }
 }
@@ -62,6 +58,19 @@ pub enum Reg {
     AStar,
     VStar,
     D,
+}
+
+impl Reg {
+    fn new(lex: &mut Lexer<Token>) -> Option<Reg> {
+        match lex.slice() {
+            "A" => Some(Reg::A),
+            "V" => Some(Reg::V),
+            "*A" => Some(Reg::AStar),
+            "*V" => Some(Reg::VStar),
+            "D" => Some(Reg::D),
+            _ => None, // todo: return a beautiful error
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
