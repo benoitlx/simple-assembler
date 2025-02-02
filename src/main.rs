@@ -1,16 +1,20 @@
 mod constants;
-mod tokenizer;
+mod lexer;
 
-use tokenizer::Token;
+use lexer::Token;
 use logos::Logos;
 
 fn main() {
-    let lex = Token::lexer("A <- 256");
+    use std::io::Read;
 
-    for result in lex {
-        match result {
-            Ok(token) => println!("{:#?}", token),
-            Err(_) => panic!("Err occured"),
+    if let Ok(mut file) = std::fs::File::open("tests/test.asm") {
+        let mut content = String::new();
+        let _ = file.read_to_string(&mut content);
+
+        let mut lex = Token::lexer(content.as_str());
+
+        while let Some(result) = lex.next() {
+            println!("{:?}", result);
         }
     }
 }
