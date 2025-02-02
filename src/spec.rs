@@ -32,10 +32,7 @@ pub mod arch_v1 {
         } 
 
         fn bit_stream(&self) -> String {
-            match self {
-                _ => "00011"
-            }
-            .to_string()
+            todo!();
         }
     }
 
@@ -76,10 +73,30 @@ pub mod arch_v1 {
     pub enum Cond {
         Eq,
         Neq,
+        Gt,
+        Lt,
+        GtEq,
+        LtEq,
+        Jump,
     }
 
-    #[derive(Debug, PartialEq)]
-    pub enum Inst {
-        Jump,
+    impl HandleToken for Cond {
+        fn new(lex: &mut Lexer<crate::lexer::Token>) -> Option<Self>
+            where Self: Sized {
+                match lex.slice() {
+                    "==" => Some(Cond::Eq),
+                    ">" => Some(Cond::Gt),
+                    "<" => Some(Cond::Lt),
+                    ">=" => Some(Cond::GtEq),
+                    "<=" => Some(Cond::LtEq),
+                    "!=" => Some(Cond::Neq),
+                    "JMP" => Some(Cond::Jump),
+                    _ => None // todo error
+                }
+        }
+
+        fn bit_stream(&self) -> String {
+            todo!();
+        }
     }
 }

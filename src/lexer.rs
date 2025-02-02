@@ -18,13 +18,13 @@ pub trait HandleToken {
 #[logos(skip r"[ \t\r\n\f]+")]
 pub enum Token {
 
+    // Condition has a higher priority than Operation
     // watchout you need to escape the good char
     // tested
-    #[regex(r"[\+&=\-|^~]", Op::new)]
+    #[regex(r"[\+&=\-|^~]", Op::new, priority = 1)]
     Operation(Op),
-
     // WIP
-    #[regex(r"==", |_| Cond::Eq)]
+    #[regex(r"(==)|(!=)|(<=)|(>=)|<|>|(JMP)", Cond::new, priority = 2)]
     Condition(Cond),
 
     // WIP
@@ -32,10 +32,6 @@ pub enum Token {
     #[regex("(0x|0X){1}[a-fA-F0-9]+", |_| 3)]
     #[regex("(0b|0B){1}(0|1)+", |_| 3)]
     Value(u16),
-
-    // WIP
-    #[token("JMP", |_| Inst::Jump)]
-    Instruction(Inst),
 
     // No test
     #[token(":", |_| Dir::Label)]
@@ -125,6 +121,27 @@ mod tests {
         // TODO: return a specific error with helper including the list of valid registers
         let mut lex = Token::lexer("B");
         assert_eq!(lex.next(), Some(Err(())));
+    }
+
+    #[test]
+    fn test_condition() {
+        let mut lex = Token::lexer("== >= <= > < != JMP");
+        assert_eq!(lex.next(), Some(Ok(Token::Condition(Cond::Eq))));
+        assert_eq!(lex.next(), Some(Ok(Token::Condition(Cond::GtEq))));
+        assert_eq!(lex.next(), Some(Ok(Token::Condition(Cond::LtEq))));
+        assert_eq!(lex.next(), Some(Ok(Token::Condition(Cond::Gt))));
+        assert_eq!(lex.next(), Some(Ok(Token::Condition(Cond::Lt))));
+        assert_eq!(lex.next(), Some(Ok(Token::Condition(Cond::Neq))));
+        assert_eq!(lex.next(), Some(Ok(Token::Condition(Cond::Jump))));
+
+        let mut lex = Token::lexer("A==A\n");
+        lex.next();
+        assert_eq!(lex.next(), Some(Ok(Token::Condition(Cond::Eq))));
+
+        let mut lex = Token::lexer("=A==A\n");
+        lex.next();
+        lex.next();
+        assert_eq!(lex.next(), Some(Ok(Token::Condition(Cond::Eq))));
     }
 
 }
