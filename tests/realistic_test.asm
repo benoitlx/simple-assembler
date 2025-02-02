@@ -36,13 +36,5 @@ A = move_mask
 D = A
 A = send
 JMP
-
-id:
-A = A - D
-A = A ~D
-A = D | *A
-A = D ^ *A
-A=A+A
-; this is a comment
-  ; comment
-A ; comment
+D ; this is a comment 
+D

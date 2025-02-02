@@ -15,33 +15,41 @@ pub trait HandleToken {
 }
 
 #[derive(Logos, Debug, PartialEq)]
-#[logos(skip r"\s+")]
+#[logos(skip r"[ \t\r\n\f]+")]
 pub enum Token {
-    #[regex(r" [+-~&|^=] ", Op::new, priority = 8)]
+
+    // watchout you need to escape the good char
+    #[regex(r"[\+&=\-|^~]", Op::new)]
     Operation(Op),
 
-    #[regex(r" [(==)<>(>=)(<=)(!=)] ", |_| Cond::Eq, priority = 7)]
+    // WIP
+    #[regex(r"==", |_| Cond::Eq)]
     Condition(Cond),
 
-    #[regex(r"[0-9]+", |_| 3, priority = 6)]
-    #[regex("(0x|0X){1}[a-fA-F0-9]+", |_| 3, priority = 6)]
-    #[regex("(0b|0B){1}(0|1)+", |_| 3, priority = 6)]
+    // WIP
+    #[regex(r"[0-9]+", |_| 3)]
+    #[regex("(0x|0X){1}[a-fA-F0-9]+", |_| 3)]
+    #[regex("(0b|0B){1}(0|1)+", |_| 3)]
     Value(u16),
 
-    #[token("JMP", |_| Inst::Jump, priority = 5)]
+    // WIP
+    #[token("JMP", |_| Inst::Jump)]
     Instruction(Inst),
 
-    #[token(":", |_| Dir::Label, priority = 4)]
-    #[token("DEFINE", |_| Dir::Define, priority = 4)]
+    // No test
+    #[token(":", |_| Dir::Label)]
+    #[token("DEFINE", |_| Dir::Define)]
     Directive(Dir),
 
-    #[regex(r"\*?[A-Z]{1}", Reg::new, priority = 3)]
+    // Register has a higher priority than Identifier
+    #[regex(r"\*?[A-Z]", Reg::new, priority = 2)]
     Register(Reg),
-
-    #[regex(r"[a-zA-Z_]+", |lex| lex.slice().to_string(), priority = 1)]
+    // No test
+    #[regex(r"[a-z_A-Z]+", |lex| lex.slice().to_string(), priority = 1)]
     Identifier(String),
 
-    #[regex(r"\s?;.*")]
+    // No test
+    #[regex(r";[^\n]*")]
     Comment,
 }
 
@@ -49,4 +57,37 @@ pub enum Token {
 pub enum Dir {
     Define,
     Label,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_operation() {
+        let mut lex = Token::lexer("+~-&|^=");
+        
+        assert_eq!(lex.next(), Some(Ok(Token::Operation(Op::Add))));
+        assert_eq!(lex.next(), Some(Ok(Token::Operation(Op::Not))));
+        assert_eq!(lex.next(), Some(Ok(Token::Operation(Op::Sub))));
+        assert_eq!(lex.next(), Some(Ok(Token::Operation(Op::And))));
+        assert_eq!(lex.next(), Some(Ok(Token::Operation(Op::Or))));
+        assert_eq!(lex.next(), Some(Ok(Token::Operation(Op::Xor))));
+        assert_eq!(lex.next(), Some(Ok(Token::Operation(Op::Assignement))));
+
+        let mut lex = Token::lexer(" +");
+        assert_eq!(lex.next(), Some(Ok(Token::Operation(Op::Add))));
+
+        let mut lex = Token::lexer("+ \n");
+        assert_eq!(lex.next(), Some(Ok(Token::Operation(Op::Add))));
+
+        let mut lex = Token::lexer("A+A\n");
+        lex.next();
+        assert_eq!(lex.next(), Some(Ok(Token::Operation(Op::Add))));
+        
+        let mut lex = Token::lexer("A +A\n");
+        lex.next();
+        assert_eq!(lex.next(), Some(Ok(Token::Operation(Op::Add))));
+    }
+
 }

@@ -1,6 +1,3 @@
-use logos::Lexer;
-
-
 pub mod arch_v1 {
     use logos::Lexer;
     use crate::lexer::HandleToken;
@@ -14,6 +11,9 @@ pub mod arch_v1 {
         Add,
         Sub,
         And,
+        Not,
+        Or,
+        Xor,
         Assignement,
     }
 
@@ -23,6 +23,9 @@ pub mod arch_v1 {
                 "+" => Some(Op::Add),
                 "-" => Some(Op::Sub),
                 "&" => Some(Op::And),
+                "~" => Some(Op::Not),
+                "|" => Some(Op::Or),
+                "^" => Some(Op::Xor),
                 "=" => Some(Op::Assignement),
                 _ => None, // todo: return a beautiful error
             }
