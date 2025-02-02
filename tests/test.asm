@@ -21,9 +21,11 @@ DEFINE f 0b111111111111111
 // DEFINE foo 0x0
 // DEFINE foo 0x0
 
-DEFINE test // error here
+// DEFINE test // error here
 // DEFINE many 0x0 argument // error here
 
 // DEFINE test test // error here
 // DEFINE t*est 0x0 // error here
 // DEFINE t/est 0x0 // error here
+
+A:
