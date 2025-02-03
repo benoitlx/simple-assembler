@@ -2,7 +2,7 @@ use logos::{Lexer, Logos};
 
 /* >> Architecture being used << */
 #[path = "spec.rs"]
-mod spec;
+pub mod spec;
 use spec::arch_v1::*;
 
 /// This trait is either used by the lexer to produce Token with the new method
@@ -36,11 +36,14 @@ pub enum Token {
     // Condition has a higher priority than Operation
     // watchout you need to escape the good char
     // tested
-    #[regex(r"[\+&=\-|^~]", Op::new, priority = 1)]
+    #[regex(r"[\+&\-|^~]", Op::new, priority = 1)]
     Operation(Op),
     // tested
     #[regex(r"(==)|(!=)|(<=)|(>=)|<|>|(JMP)", Cond::new, priority = 2)]
     Condition(Cond),
+
+    #[token("=")]
+    Assignement,
 
     // tested 
     #[regex(r"[0-9]+", Token::decimal)]
@@ -102,7 +105,7 @@ mod tests {
 
     #[test]
     fn test_operation() {
-        let mut lex = Token::lexer("+~-&|^=");
+        let mut lex = Token::lexer("+~-&|^");
 
         assert_eq!(lex.next(), Some(Ok(Token::Operation(Op::Add))));
         assert_eq!(lex.next(), Some(Ok(Token::Operation(Op::Not))));
@@ -110,7 +113,6 @@ mod tests {
         assert_eq!(lex.next(), Some(Ok(Token::Operation(Op::And))));
         assert_eq!(lex.next(), Some(Ok(Token::Operation(Op::Or))));
         assert_eq!(lex.next(), Some(Ok(Token::Operation(Op::Xor))));
-        assert_eq!(lex.next(), Some(Ok(Token::Operation(Op::Assignement))));
 
         let mut lex = Token::lexer(" +");
         assert_eq!(lex.next(), Some(Ok(Token::Operation(Op::Add))));
@@ -125,6 +127,12 @@ mod tests {
         let mut lex = Token::lexer("A +A\n");
         lex.next();
         assert_eq!(lex.next(), Some(Ok(Token::Operation(Op::Add))));
+    }
+
+    #[test]
+    fn test_assignement() {
+        let mut lex = Token::lexer("=");
+        assert_eq!(lex.next(), Some(Ok(Token::Assignement)));
     }
 
     #[test]
@@ -241,5 +249,18 @@ mod tests {
         assert_eq!(lex.next(), Some(Ok(Token::Comment)));
         assert_eq!(lex.next(), Some(Ok(Token::Comment)));
         assert_eq!(lex.next(), Some(Ok(Token::Comment)));
+    }
+
+    #[test]
+    fn test_weird_behavior() {
+        let mut lex = Token::lexer("move:\nA = move_mask\nD = A\n");
+        assert_eq!(lex.next(), Some(Ok(Token::Identifier("move".to_string()))));
+        assert_eq!(lex.next(), Some(Ok(Token::Directive(Dir::Label))));
+        assert_eq!(lex.next(), Some(Ok(Token::Register(Reg::A))));
+        assert_eq!(lex.next(), Some(Ok(Token::Assignement)));
+        assert_eq!(lex.next(), Some(Ok(Token::Identifier("move_mask".to_string()))));
+        assert_eq!(lex.next(), Some(Ok(Token::Register(Reg::D))));
+        assert_eq!(lex.next(), Some(Ok(Token::Assignement)));
+        assert_eq!(lex.next(), Some(Ok(Token::Register(Reg::A))));
     }
 }
