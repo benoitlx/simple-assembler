@@ -42,23 +42,23 @@ pub enum Token {
     #[regex(r"(==)|(!=)|(<=)|(>=)|<|>|(JMP)", Cond::new, priority = 2)]
     Condition(Cond),
 
-    // WIP
+    // tested 
     #[regex(r"[0-9]+", Token::decimal)]
     #[regex("0x[a-fA-F0-9]+", Token::hexadecimal)]
     #[regex("0b(0|1)+", Token::binary)]
     Value(u16),
 
     // tested
-    #[token(":", |_| Dir::Label)]
-    #[token("DEFINE", |_| Dir::Define)]
+    #[token(":", Dir::new)]
+    #[token("DEFINE", Dir::new)]
     Directive(Dir),
 
     // Register has a higher priority than Identifier
     // tested
     #[regex(r"\*?[A-Z]", Reg::new, priority = 2)]
     Register(Reg),
-    // No test
-    #[regex(r"[a-z_A-Z]+", |lex| lex.slice().to_string(), priority = 1)]
+    // tested 
+    #[regex(r"[a-z_A-Z]+", Token::text, priority = 1)]
     Identifier(String),
 
     // No test
@@ -70,6 +70,10 @@ impl Token {
     parse_number!(decimal, "", 10);
     parse_number!(hexadecimal, "0x", 16);
     parse_number!(binary, "0b", 2);
+
+    fn text(lex: &mut Lexer<Token>) -> Option<String> {
+        Some(lex.slice().to_string())
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -209,5 +213,22 @@ mod tests {
         assert_eq!(lex.next(), Some(Err(())));
         assert_eq!(lex.next(), Some(Err(())));
         assert_eq!(lex.next(), Some(Err(())));
+    }
+
+    #[test]
+    fn test_identifier() {
+        let mut lex = Token::lexer("DEFINE id 0x0\nid:");
+        lex.next();
+        assert_eq!(lex.next(), Some(Ok(Token::Identifier("id".to_string()))));
+        lex.next();
+        assert_eq!(lex.next(), Some(Ok(Token::Identifier("id".to_string()))));
+
+        let test_string = "a b c foo bar FOO BAR foo_bar FOO_BAR Foo_Bar";
+        let string_iter = test_string.split(" ");
+        let mut lex = Token::lexer(test_string);
+
+        for word in string_iter {
+            assert_eq!(lex.next(), Some(Ok(Token::Identifier(word.to_string()))));
+        }
     }
 }
