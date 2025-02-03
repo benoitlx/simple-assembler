@@ -231,4 +231,14 @@ mod tests {
             assert_eq!(lex.next(), Some(Ok(Token::Identifier(word.to_string()))));
         }
     }
+
+    #[test]
+    fn test_comment() {
+        let mut lex = Token::lexer("; this is a comment\nD ; comment\n;;;;\n;comm\n");
+        assert_eq!(lex.next(), Some(Ok(Token::Comment)));
+        lex.next();
+        assert_eq!(lex.next(), Some(Ok(Token::Comment)));
+        assert_eq!(lex.next(), Some(Ok(Token::Comment)));
+        assert_eq!(lex.next(), Some(Ok(Token::Comment)));
+    }
 }
