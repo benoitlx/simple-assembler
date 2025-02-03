@@ -49,7 +49,8 @@ pub enum Token {
     Value(u16),
 
     // tested
-    #[regex(r"(DEFINE|:)", Dir::new)]
+    #[token(":", Dir::new)]
+    #[token("DEFINE", Dir::new)]
     Directive(Dir),
 
     // Register has a higher priority than Identifier
@@ -60,7 +61,7 @@ pub enum Token {
     #[regex(r"[a-z_A-Z]+", Token::text, priority = 1)]
     Identifier(String),
 
-    // Tested 
+    // No test
     #[regex(r";[^\n]*")]
     Comment,
 }
@@ -97,6 +98,7 @@ impl HandleToken for Dir {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn test_operation() {
