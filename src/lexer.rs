@@ -49,8 +49,7 @@ pub enum Token {
     Value(u16),
 
     // tested
-    #[token(":", Dir::new)]
-    #[token("DEFINE", Dir::new)]
+    #[regex(r"(DEFINE|:)", Dir::new)]
     Directive(Dir),
 
     // Register has a higher priority than Identifier
@@ -61,7 +60,7 @@ pub enum Token {
     #[regex(r"[a-z_A-Z]+", Token::text, priority = 1)]
     Identifier(String),
 
-    // No test
+    // Tested 
     #[regex(r";[^\n]*")]
     Comment,
 }
