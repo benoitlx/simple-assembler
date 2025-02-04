@@ -14,7 +14,6 @@ pub mod arch_v1 {
         Not,
         Or,
         Xor,
-        Assignement,
     }
 
     impl HandleToken for Op {
@@ -26,13 +25,19 @@ pub mod arch_v1 {
                 "~" => Some(Op::Not),
                 "|" => Some(Op::Or),
                 "^" => Some(Op::Xor),
-                "=" => Some(Op::Assignement),
                 _ => None, // todo: return a beautiful error
             }
         }
 
         fn bit_stream(&self) -> String {
-            todo!();
+            match self {
+                Op::Add => "000",
+                Op::Sub => "001",
+                Op::And => "010",
+                Op::Or => "011",
+                Op::Xor => "100",
+                Op::Not => "101"
+            }.to_string()
         }
     }
 
@@ -98,7 +103,16 @@ pub mod arch_v1 {
         }
 
         fn bit_stream(&self) -> String {
-            todo!();
+            match self {
+                Cond::Eq => "010",
+                Cond::Neq => "101",
+                Cond::Gt => "001",
+                Cond::Lt => "100",
+                Cond::GtEq => "011",
+                Cond::LtEq => "110",
+                Cond::Jump => "111",
+            }
+            .to_string()
         }
     }
 }
