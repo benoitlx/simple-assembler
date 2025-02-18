@@ -6,7 +6,7 @@ pub mod arch_v1 {
 
     pub const MAX_LOAD_VALUE: u16 = 2_u16.pow(15) - 1;
 
-    #[derive(Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum Op {
         Add,
         Sub,
@@ -41,7 +41,7 @@ pub mod arch_v1 {
         }
     }
 
-    #[derive(Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum Reg {
         A,
         V,
@@ -74,7 +74,7 @@ pub mod arch_v1 {
         } // todo: colorize the string depending on the register
     }
 
-    #[derive(Debug, PartialEq)]
+    #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum Cond {
         Eq,
         Neq,

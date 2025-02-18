@@ -11,8 +11,10 @@ fn main() {
         let mut content = String::new();
         let _ = file.read_to_string(&mut content);
 
-        let mut lex = Token::lexer(content.as_str());
+        let lex = Token::lexer(content.as_str());
 
-        println!("{}", parser::generate_bit_stream(&mut lex));
+        let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
+
+        println!("{}", parser::generate_bit_stream_v2(&mut tokens));
     }
 }
