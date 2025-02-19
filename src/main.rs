@@ -17,7 +17,7 @@ fn main() {
 
         println!(
             "{}",
-            parser::generate_bit_stream_v2(&mut tokens, true, false, "\n")
+            parser::generate_bit_stream(&mut tokens, true, true, "\n").0
         );
     }
 }

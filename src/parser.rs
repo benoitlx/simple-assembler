@@ -32,12 +32,12 @@ fn inst_mode_format(op_or_cond: Op, rega: Reg, regb: Reg, regc: Reg) -> String {
     )
 }
 
-pub fn generate_bit_stream_v2(
+pub fn generate_bit_stream(
     tokens: &mut Vec<(Result<Token, ()>, Range<usize>)>,
     colorize: bool,
     debug: bool,
     sep: &str,
-) -> String {
+) -> (String, HashMap<String, (u16, Range<usize>)>) {
     colored::control::set_override(colorize);
     if colorize {
         println!(
@@ -116,7 +116,7 @@ pub fn generate_bit_stream_v2(
             }
             // A == D
             [(Ok(Register(rega)), _), (Ok(Condition(_cond)), _), (Ok(Register(regb)), _), _, _] => {
-                i += 1;
+                i += 3;
                 adr += 16;
                 inst_mode_format(Op::Add, *rega, *regb, Reg::A) // Fixme: argument type for cond
             }
@@ -198,5 +198,29 @@ pub fn generate_bit_stream_v2(
         .map(|s| handle_id(s, &mut id_collect))
         .collect();
 
-    bit_stream.join(sep)
+    (bit_stream.join(sep), id_collect)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use logos::Logos;
+
+    #[test]
+    fn test_define() {
+        let src = "DEFINE foo 0\nDEFINE bar 1\nDEFINE titi 42\nDEFINE tata 73";
+        let mut collection: HashMap<String, (u16, Range<usize>)> = HashMap::new();
+        collection.insert("foo".to_string(), (0, 7..10));
+        collection.insert("bar".to_string(), (1, 20..23));
+        collection.insert("titi".to_string(), (42, 33..37));
+        collection.insert("tata".to_string(), (73, 48..52));
+
+        let lex = Token::lexer(src);
+
+        let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
+        assert_eq!(collection, generate_bit_stream(&mut tokens, false, false, "").1);
+        assert_eq!(collection, generate_bit_stream(&mut tokens, false, true, "").1);
+        assert_eq!(collection, generate_bit_stream(&mut tokens, true, false, "").1);
+        assert_eq!(collection, generate_bit_stream(&mut tokens, true, true, "").1);
+    }
 }
