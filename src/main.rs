@@ -15,6 +15,9 @@ fn main() {
 
         let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
 
-        println!("{}", parser::generate_bit_stream_v2(&mut tokens));
+        println!(
+            "{}",
+            parser::generate_bit_stream_v2(&mut tokens, true, false, "\n")
+        );
     }
 }
