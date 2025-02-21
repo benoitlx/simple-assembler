@@ -223,4 +223,21 @@ mod tests {
         assert_eq!(collection, generate_bit_stream(&mut tokens, true, false, "").1);
         assert_eq!(collection, generate_bit_stream(&mut tokens, true, true, "").1);
     }
+
+    #[test]
+    fn test_label() {
+        let src = "main:\nJMP\nlabel:\nJMP\nJMP\nJMP\nJMP\nJMP\nJMP\nJMP\nJMP\ntiti:";
+        let mut collection: HashMap<String, (u16, Range<usize>)> = HashMap::new();
+        collection.insert("main".to_string(), (0, 0..4));
+        collection.insert("label".to_string(), (16, 10..15));
+        collection.insert("titi".to_string(), (144, 49..53));
+
+        let lex = Token::lexer(src);
+
+        let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
+        assert_eq!(collection, generate_bit_stream(&mut tokens, false, false, "").1);
+        assert_eq!(collection, generate_bit_stream(&mut tokens, false, true, "").1);
+        assert_eq!(collection, generate_bit_stream(&mut tokens, true, false, "").1);
+        assert_eq!(collection, generate_bit_stream(&mut tokens, true, true, "").1);
+    }
 }
