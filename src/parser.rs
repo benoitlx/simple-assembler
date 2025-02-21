@@ -240,4 +240,28 @@ mod tests {
         assert_eq!(collection, generate_bit_stream(&mut tokens, true, false, "").1);
         assert_eq!(collection, generate_bit_stream(&mut tokens, true, true, "").1);
     }
+
+    #[test]
+    fn test_load_value() {
+        let src = "DEFINE mask 42\nA = 0\nA = 0x7fff\nA = mask";
+        let expected = "1000000000000000\n1111111111111111\n1000000000101010";
+
+        let lex = Token::lexer(src);
+
+        let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
+
+        assert_eq!(expected, generate_bit_stream(&mut tokens, false, false, "\n").0);
+        assert_eq!(expected, generate_bit_stream(&mut tokens, false, true, "\n").0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_load_value_into_wrong_register() {
+        let src = "D = 0";
+
+        let lex = Token::lexer(src);
+
+        let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
+        generate_bit_stream(&mut tokens, false, false, "");
+    }
 }
