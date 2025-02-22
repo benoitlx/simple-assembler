@@ -11,7 +11,8 @@ D = A
 A = io_adr
 D = D & *A
 A = wait
-D != A
+D !=
+JMP
 
 check:
 A = ob_detection_mask
@@ -19,7 +20,8 @@ D = A
 A = io_adr
 D = D & *A
 A = move
-D == *A
+D ==
+JMP
 
 turn:
 A = left
