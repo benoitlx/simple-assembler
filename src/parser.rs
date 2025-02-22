@@ -136,9 +136,12 @@ pub fn generate_bit_stream(
                 adr += 16;
                 inst_mode_format(OpOrCond::Operation(Op::Or), *rega, Reg::Zero, *regc)
             }
-            // A <- ~D
+            // A <- ~D, tested
             [(Ok(Register(regc)), _), (Ok(Assignement), _), (Ok(Operation(op)), _), (Ok(Register(rega)), _), _] =>
             {
+                if *op != Op::Not {
+                    panic!("Expected a not operation");
+                }
                 if *regc == Reg::A && *rega == Reg::AStar {
                     panic!("Cannot change A value when reading *A");
                 }
@@ -403,5 +406,37 @@ mod tests {
             expected,
             generate_bit_stream(&mut tokens, false, true, "\n").0
         );
+    }
+
+    #[test]
+    fn test_not() {
+        let src = "A = ~D\nD = ~V";
+
+        let expected = "0101000100000000\n0101000010000100";
+
+        let lex = Token::lexer(src);
+
+        let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
+
+        assert_eq!(
+            expected,
+            generate_bit_stream(&mut tokens, false, false, "\n").0
+        );
+        assert_eq!(
+            expected,
+            generate_bit_stream(&mut tokens, false, true, "\n").0
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_non_single_operand_operation() {
+        let src = "A = +D";
+
+        let lex = Token::lexer(src);
+
+        let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
+
+        generate_bit_stream(&mut tokens, false, false, "");
     }
 }
