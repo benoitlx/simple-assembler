@@ -48,6 +48,8 @@ pub mod arch_v1 {
         AStar,
         VStar,
         D,
+        Zero,
+        One
     }
 
     impl HandleToken for Reg {
@@ -58,6 +60,8 @@ pub mod arch_v1 {
                 "*A" => Some(Reg::AStar),
                 "*V" => Some(Reg::VStar),
                 "D" => Some(Reg::D),
+                "Z" => Some(Reg::Zero),
+                "O" => Some(Reg::One),
                 _ => None, // todo: return a beautiful error
             }
         }
@@ -69,6 +73,8 @@ pub mod arch_v1 {
                 Reg::V => "010",
                 Reg::VStar => "011",
                 Reg::D => "100",
+                Reg::Zero => "110",
+                Reg::One => "111",
             }
             .to_string()
         } // todo: colorize the string depending on the register

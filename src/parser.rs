@@ -21,9 +21,27 @@ fn data_mode_format(val: u16) -> String {
     format!("{}{}", "1".green(), format!("{:015b}", val).red())
 }
 
-fn inst_mode_format(op_or_cond: Op, rega: Reg, regb: Reg, regc: Reg) -> String {
+trait BitStream {
+    fn bit_stream(&self) -> String;
+}
+
+enum OpOrCond {
+    Operation(Op),
+    Condition(Cond),
+}
+
+impl BitStream for OpOrCond {
+    fn bit_stream(&self) -> String {
+        match self {
+            OpOrCond::Operation(op) => op.bit_stream(),
+            OpOrCond::Condition(cond) => cond.bit_stream(),
+        }
+    }
+}
+
+fn inst_mode_format(op_or_cond: OpOrCond, rega: Reg, regb: Reg, regc: Reg) -> String {
     format!(
-        "{}{}{}{}{}000",
+        "{}{}000{}{}{}",
         "0".green().bold(),
         op_or_cond.bit_stream().blue(),
         rega.bit_stream().yellow(),
@@ -76,12 +94,17 @@ pub fn generate_bit_stream(
             // A <- D & *A
             [(Ok(Register(regc)), _), (Ok(Assignement), _), (Ok(Register(rega)), _), (Ok(Operation(op)), _), (Ok(Register(regb)), _)] =>
             {
-                // FIXME: protection rule between the regs
+                if *regc == Reg::A && (*rega == Reg::AStar || *regb == Reg::AStar) {
+                    panic!("Cannot change A value when reading *A");
+                }
+                if *regc == Reg::V && (*rega == Reg::VStar || *regb == Reg::VStar) {
+                    panic!("Cannot change V value when reading *V");
+                }
                 i += 5;
                 adr += 16;
-                inst_mode_format(*op, *rega, *regb, *regc)
+                inst_mode_format(OpOrCond::Operation(*op), *rega, *regb, *regc)
             }
-            // A <- mask
+            // A <- mask, tested
             [(Ok(Register(regc)), _), (Ok(Assignement), _), (Ok(Identifier(id)), _), _, _] => {
                 if *regc != Reg::A {
                     panic!("Can't push direct value into an other register than A")
@@ -91,7 +114,7 @@ pub fn generate_bit_stream(
                 adr += 16;
                 id.clone()
             }
-            // A <- 0x7fff
+            // A <- 0x7fff, tested
             [(Ok(Register(regc)), _), (Ok(Assignement), _), (Ok(Value(val)), _), _, _] => {
                 if *regc != Reg::A {
                     panic!("Can't push direct value into an other register than A")
@@ -101,33 +124,49 @@ pub fn generate_bit_stream(
                 adr += 16;
                 data_mode_format(*val)
             }
-            // A <- D
+            // A <- D, tested
             [(Ok(Register(regc)), _), (Ok(Assignement), _), (Ok(Register(rega)), _), _, _] => {
+                if *regc == Reg::A && *rega == Reg::AStar {
+                    panic!("Cannot change A value when reading *A");
+                }
+                if *regc == Reg::V && *rega == Reg::VStar {
+                    panic!("Cannot change V value when reading *V");
+                }
                 i += 3;
                 adr += 16;
-                inst_mode_format(Op::Or, *rega, Reg::A, *regc) // Fixme: add Reg::One and Reg::Zero
+                inst_mode_format(OpOrCond::Operation(Op::Or), *rega, Reg::Zero, *regc)
             }
             // A <- ~D
             [(Ok(Register(regc)), _), (Ok(Assignement), _), (Ok(Operation(op)), _), (Ok(Register(rega)), _), _] =>
             {
+                if *regc == Reg::A && *rega == Reg::AStar {
+                    panic!("Cannot change A value when reading *A");
+                }
+                if *regc == Reg::V && *rega == Reg::VStar {
+                    panic!("Cannot change V value when reading *V");
+                }
                 i += 4;
                 adr += 16;
-                inst_mode_format(*op, *rega, Reg::A, *regc) // Fixme: add Reg::One and Reg::Zero
+                inst_mode_format(OpOrCond::Operation(*op), *rega, Reg::A, *regc) // Fixme: add Reg::One and Reg::Zero
             }
-            // A == D
-            [(Ok(Register(rega)), _), (Ok(Condition(_cond)), _), (Ok(Register(regb)), _), _, _] => {
-                i += 3;
+            // D>=, tested
+            /*
+            A <- main
+            D>= (<=> D >= 0 ?)
+            JMP
+             */
+            [(Ok(Register(rega)), _), (Ok(Condition(cond)), _), _, _, _] => {
+                i += 2;
                 adr += 16;
-                inst_mode_format(Op::Add, *rega, *regb, Reg::A) // Fixme: argument type for cond
+                inst_mode_format(OpOrCond::Condition(*cond), *rega, Reg::Zero, Reg::Zero) // Fixme: argument type for cond
             }
-            // JMP
+            // JMP, tested
             [(Ok(Condition(Cond::Jump)), _), _, _, _, _] => {
                 i += 1;
                 adr += 16;
-                // inst_mode_format(Op::Add, Reg::A, Reg::A, Reg::A) // fixme: replace with proper values
                 format!("0111000000000000")
             }
-            // label:
+            // label:, tested
             [(Ok(Identifier(id)), span), (Ok(Directive(Dir::Label)), _), _, _, _] => {
                 i += 2;
 
@@ -145,7 +184,7 @@ pub fn generate_bit_stream(
 
                 String::new()
             }
-            // DEFINE mask 0x1
+            // DEFINE mask 0x1, tested
             [(Ok(Directive(Dir::Define)), _), (Ok(Identifier(id)), span), (Ok(Value(val)), _), _, _] =>
             {
                 i += 3;
@@ -218,10 +257,22 @@ mod tests {
         let lex = Token::lexer(src);
 
         let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
-        assert_eq!(collection, generate_bit_stream(&mut tokens, false, false, "").1);
-        assert_eq!(collection, generate_bit_stream(&mut tokens, false, true, "").1);
-        assert_eq!(collection, generate_bit_stream(&mut tokens, true, false, "").1);
-        assert_eq!(collection, generate_bit_stream(&mut tokens, true, true, "").1);
+        assert_eq!(
+            collection,
+            generate_bit_stream(&mut tokens, false, false, "").1
+        );
+        assert_eq!(
+            collection,
+            generate_bit_stream(&mut tokens, false, true, "").1
+        );
+        assert_eq!(
+            collection,
+            generate_bit_stream(&mut tokens, true, false, "").1
+        );
+        assert_eq!(
+            collection,
+            generate_bit_stream(&mut tokens, true, true, "").1
+        );
     }
 
     #[test]
@@ -235,10 +286,22 @@ mod tests {
         let lex = Token::lexer(src);
 
         let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
-        assert_eq!(collection, generate_bit_stream(&mut tokens, false, false, "").1);
-        assert_eq!(collection, generate_bit_stream(&mut tokens, false, true, "").1);
-        assert_eq!(collection, generate_bit_stream(&mut tokens, true, false, "").1);
-        assert_eq!(collection, generate_bit_stream(&mut tokens, true, true, "").1);
+        assert_eq!(
+            collection,
+            generate_bit_stream(&mut tokens, false, false, "").1
+        );
+        assert_eq!(
+            collection,
+            generate_bit_stream(&mut tokens, false, true, "").1
+        );
+        assert_eq!(
+            collection,
+            generate_bit_stream(&mut tokens, true, false, "").1
+        );
+        assert_eq!(
+            collection,
+            generate_bit_stream(&mut tokens, true, true, "").1
+        );
     }
 
     #[test]
@@ -250,8 +313,14 @@ mod tests {
 
         let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
 
-        assert_eq!(expected, generate_bit_stream(&mut tokens, false, false, "\n").0);
-        assert_eq!(expected, generate_bit_stream(&mut tokens, false, true, "\n").0);
+        assert_eq!(
+            expected,
+            generate_bit_stream(&mut tokens, false, false, "\n").0
+        );
+        assert_eq!(
+            expected,
+            generate_bit_stream(&mut tokens, false, true, "\n").0
+        );
     }
 
     #[test]
@@ -263,5 +332,76 @@ mod tests {
 
         let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
         generate_bit_stream(&mut tokens, false, false, "");
+    }
+
+    #[test]
+    fn test_register_transfer() {
+        let src = "D = A\nD = D\nD = *A\nA = D\n*A = D\n*A = A";
+
+        let expected = "0011000000110100\n0011000100110100\n0011000001110100\n0011000100110000\n0011000100110001\n0011000000110001";
+
+        let lex = Token::lexer(src);
+
+        let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
+
+        assert_eq!(
+            expected,
+            generate_bit_stream(&mut tokens, false, false, "\n").0
+        );
+        assert_eq!(
+            expected,
+            generate_bit_stream(&mut tokens, false, true, "\n").0
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_wrong_register_transfer() {
+        let src = "A = *A\nV = *V";
+
+        let lex = Token::lexer(src);
+
+        let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
+        generate_bit_stream(&mut tokens, false, false, "");
+    }
+
+    #[test]
+    fn test_condition() {
+        let src = "D==\nD>=\n*A>=";
+
+        let expected = "0010000100110110\n0011000100110110\n0011000001110110";
+
+        let lex = Token::lexer(src);
+
+        let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
+
+        assert_eq!(
+            expected,
+            generate_bit_stream(&mut tokens, false, false, "\n").0
+        );
+        assert_eq!(
+            expected,
+            generate_bit_stream(&mut tokens, false, true, "\n").0
+        );
+    }
+
+    #[test]
+    fn test_jump() {
+        let src = "JMP";
+
+        let expected = "0111000000000000";
+
+        let lex = Token::lexer(src);
+
+        let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
+
+        assert_eq!(
+            expected,
+            generate_bit_stream(&mut tokens, false, false, "\n").0
+        );
+        assert_eq!(
+            expected,
+            generate_bit_stream(&mut tokens, false, true, "\n").0
+        );
     }
 }
