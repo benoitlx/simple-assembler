@@ -6,10 +6,6 @@ use std::ops::Range;
 
 /*
 TODO:
-- should merge Op and Cond since they have the same bit placement in the instruction
-- Add default implementation for Reg Cond and Op
-- parser les conditions
-- tests
 - pour chaque panic donner les bonnes infos l'endroit du token fautif ...
 
 Futur:
@@ -100,6 +96,9 @@ pub fn generate_bit_stream(
                 if *regc == Reg::V && (*rega == Reg::VStar || *regb == Reg::VStar) {
                     panic!("Cannot change V value when reading *V");
                 }
+                if *op == Op::Not {
+                    panic!("Too many operand for ~");
+                }
                 i += 5;
                 adr += 16;
                 inst_mode_format(OpOrCond::Operation(*op), *rega, *regb, *regc)
@@ -150,7 +149,7 @@ pub fn generate_bit_stream(
                 }
                 i += 4;
                 adr += 16;
-                inst_mode_format(OpOrCond::Operation(*op), *rega, Reg::A, *regc) // Fixme: add Reg::One and Reg::Zero
+                inst_mode_format(OpOrCond::Operation(*op), *rega, Reg::A, *regc)
             }
             // D>=, tested
             /*
@@ -161,7 +160,7 @@ pub fn generate_bit_stream(
             [(Ok(Register(rega)), _), (Ok(Condition(cond)), _), _, _, _] => {
                 i += 2;
                 adr += 16;
-                inst_mode_format(OpOrCond::Condition(*cond), *rega, Reg::Zero, Reg::Zero) // Fixme: argument type for cond
+                inst_mode_format(OpOrCond::Condition(*cond), *rega, Reg::Zero, Reg::Zero)
             }
             // JMP, tested
             [(Ok(Condition(Cond::Jump)), _), _, _, _, _] => {
@@ -432,6 +431,50 @@ mod tests {
     #[should_panic]
     fn test_non_single_operand_operation() {
         let src = "A = +D";
+
+        let lex = Token::lexer(src);
+
+        let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
+
+        generate_bit_stream(&mut tokens, false, false, "");
+    }
+
+    #[test]
+    fn test_double_operand_operation() {
+        let src = "A = A + D\nA = A & D\nD = *A | A";
+
+        let expected = "0000000000100000\n0010000000100000\n0011000001000100";
+
+        let lex = Token::lexer(src);
+
+        let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
+
+        assert_eq!(
+            expected,
+            generate_bit_stream(&mut tokens, false, false, "\n").0
+        );
+        assert_eq!(
+            expected,
+            generate_bit_stream(&mut tokens, false, true, "\n").0
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_wrong_double_operand_operation() {
+        let src = "A = A ~ D";
+
+        let lex = Token::lexer(src);
+
+        let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
+
+        generate_bit_stream(&mut tokens, false, false, "");
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_incompatible_registers() {
+        let src = "A = A + *A\nV = V + *V\nA = *A & D";
 
         let lex = Token::lexer(src);
 
