@@ -4,8 +4,15 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-logos = "0.15.0"
-miette = "7.4.0"
+colored = "3.0.0"
+logos = { version = "0.15.0", features = ["debug"] }
 
 [dev-dependencies]
 rusty-hook = "^0.11.2"
+pretty_assertions = "1"
+
+[features]
+# this effectively enable the feature `no-color` of colored when testing with
+# `cargo test --feature dumb_terminal`
+dumb_terminal = ["colored/no-color"]
+default = ["dumb_terminal"]

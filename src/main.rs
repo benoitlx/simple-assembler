@@ -1,29 +1,23 @@
-mod constants;
-mod tokenizer;
+mod lexer;
+mod parser;
 
-use tokenizer::Token;
+use lexer::Token;
 use logos::Logos;
-use std::fs::File;
-use std::io::prelude::*;
-use std::env;
 
-fn main() -> std::io::Result<()> {
-    let args: Vec<String> = env::args().collect();
+fn main() {
+    use std::io::Read;
 
-    let mut file = File::open(&args[1])?;
-    let mut contents = String::new();
+    if let Ok(mut file) = std::fs::File::open("tests/real_test/realistic_test.asm") {
+        let mut content = String::new();
+        let _ = file.read_to_string(&mut content);
 
-    file.read_to_string(&mut contents)?;
+        let lex = Token::lexer(content.as_str());
 
+        let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
 
-    let lex = Token::lexer(contents.as_str());
-
-    for result in lex {
-        match result {
-            Ok(token) => println!("{:#?}", token),
-            Err(_) => panic!("Err occured"),
-        }
+        println!(
+            "{}",
+            parser::generate_bit_stream(&mut tokens, true, true, "\n").0
+        );
     }
-
-    Ok(())
 }
