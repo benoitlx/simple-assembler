@@ -5,7 +5,8 @@ edition = "2021"
 
 [dependencies]
 colored = "3.0.0"
-logos = { version = "0.15.0", features = ["debug"] }
+logos = { version = "0.15.0" }# , features = ["debug"] }
+miette = { version = "7.5.0", features = ["fancy"] }
 
 [dev-dependencies]
 rusty-hook = "^0.11.2"
