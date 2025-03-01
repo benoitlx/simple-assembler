@@ -1,6 +1,7 @@
 use crate::lexer::spec::arch_v1::*;
 use crate::lexer::{Token::*, *};
 use colored::Colorize;
+use miette::{miette, LabeledSpan, Error};
 use std::collections::HashMap;
 use std::ops::Range;
 
@@ -51,21 +52,11 @@ pub fn generate_bit_stream(
     colorize: bool,
     debug: bool,
     sep: &str,
-) -> (String, HashMap<String, (u16, Range<usize>)>) {
+) -> (String, HashMap<String, (u16, Range<usize>)>, Vec<Error>) {
     colored::control::set_override(colorize);
-    if colorize {
-        println!(
-            "{}\n{}\n{}\n{}\n{}\n{}\n",
-            "15 bits value".red(),
-            "op/jump code".blue(),
-            "mode bit".green(),
-            "source A reg".yellow(),
-            "source B reg".purple(),
-            "dest reg".cyan()
-        );
-    }
-
     let mut bit_stream_with_id: Vec<String> = vec![];
+
+    let mut errors: Vec<Error> = vec![];
 
     // Hashmap for the identifiers
     let mut id_collect: HashMap<String, (u16, Range<usize>)> = HashMap::new();
@@ -104,9 +95,16 @@ pub fn generate_bit_stream(
                 inst_mode_format(OpOrCond::Operation(*op), *rega, *regb, *regc)
             }
             // A <- mask, tested
-            [(Ok(Register(regc)), _), (Ok(Assignement), _), (Ok(Identifier(id)), _), _, _] => {
+            [(Ok(Register(regc)), span), (Ok(Assignement), _), (Ok(Identifier(id)), _), _, _] => {
                 if *regc != Reg::A {
-                    panic!("Can't push direct value into an other register than A")
+                    let report = miette!(
+                        labels = vec![
+                            LabeledSpan::at(span.clone(), "This should be A")
+                        ],
+                        help = format!("Consider using this: \nA = {id}\n{:?} = A", *regc),
+                        "Error Can't push direct value into other register than A"
+                    );
+                    errors.push(report);
                 }
 
                 i += 3;
@@ -114,9 +112,16 @@ pub fn generate_bit_stream(
                 id.clone()
             }
             // A <- 0x7fff, tested
-            [(Ok(Register(regc)), _), (Ok(Assignement), _), (Ok(Value(val)), _), _, _] => {
+            [(Ok(Register(regc)), span), (Ok(Assignement), _), (Ok(Value(val)), _), _, _] => {
                 if *regc != Reg::A {
-                    panic!("Can't push direct value into an other register than A")
+                    let report = miette!(
+                        labels = vec![
+                            LabeledSpan::at(span.clone(), "This should be A")
+                        ],
+                        help = format!("Consider using this: \nA = {val}\n{:?} = A", *regc),
+                        "Error Can't push direct value into other register than A"
+                    );
+                    errors.push(report);
                 }
 
                 i += 3;
@@ -124,12 +129,26 @@ pub fn generate_bit_stream(
                 data_mode_format(*val)
             }
             // A <- D, tested
-            [(Ok(Register(regc)), _), (Ok(Assignement), _), (Ok(Register(rega)), _), _, _] => {
+            [(Ok(Register(regc)), spanc), (Ok(Assignement), _), (Ok(Register(rega)), spana), _, _] => {
                 if *regc == Reg::A && *rega == Reg::AStar {
-                    panic!("Cannot change A value when reading *A");
+                    let report = miette!(
+                        labels = vec![
+                            LabeledSpan::at(spanc.clone(), "This"),
+                            LabeledSpan::at(spana.clone(), "and this are incompatible"),
+                        ],
+                        "Error Can't change A value when reading *A"
+                    );
+                    errors.push(report);
                 }
                 if *regc == Reg::V && *rega == Reg::VStar {
-                    panic!("Cannot change V value when reading *V");
+                    let report = miette!(
+                        labels = vec![
+                            LabeledSpan::at(spanc.clone(), "This"),
+                            LabeledSpan::at(spana.clone(), "and this are incompatible"),
+                        ],
+                        "Error Can't change V value when reading *V"
+                    );
+                    errors.push(report);
                 }
                 i += 3;
                 adr += 16;
@@ -239,7 +258,7 @@ pub fn generate_bit_stream(
         .map(|s| handle_id(s, &mut id_collect))
         .collect();
 
-    (bit_stream.join(sep), id_collect)
+    (bit_stream.join(sep), id_collect, errors)
 }
 
 #[cfg(test)]
@@ -326,14 +345,13 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn test_load_value_into_wrong_register() {
         let src = "D = 0";
 
         let lex = Token::lexer(src);
 
         let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
-        generate_bit_stream(&mut tokens, false, false, "");
+        assert!(!generate_bit_stream(&mut tokens, false, false, "").2.is_empty());
     }
 
     #[test]
@@ -357,14 +375,13 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn test_wrong_register_transfer() {
         let src = "A = *A\nV = *V";
 
         let lex = Token::lexer(src);
 
         let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
-        generate_bit_stream(&mut tokens, false, false, "");
+        assert!(!generate_bit_stream(&mut tokens, false, false, "").2.is_empty())
     }
 
     #[test]
