@@ -79,16 +79,38 @@ pub fn generate_bit_stream(
 
         let inst_word = match tokens_window {
             // A <- D & *A
-            [(Ok(Register(regc)), _), (Ok(Assignement), _), (Ok(Register(rega)), _), (Ok(Operation(op)), _), (Ok(Register(regb)), _)] =>
+            [(Ok(Register(regc)), spanc), (Ok(Assignement), _), (Ok(Register(rega)), spana), (Ok(Operation(op)), spanop), (Ok(Register(regb)), spanb)] =>
             {
                 if *regc == Reg::A && (*rega == Reg::AStar || *regb == Reg::AStar) {
-                    panic!("Cannot change A value when reading *A");
+                    let report = miette!(
+                        labels = vec![
+                            LabeledSpan::at(spanc.clone(), "This"),
+                            LabeledSpan::at((spana.clone()).start..(spanb.clone().end), "and this are incompatible"),
+                        ],
+                        "Error Can't change A value when reading *A"
+                    );
+                    errors.push(report);
                 }
                 if *regc == Reg::V && (*rega == Reg::VStar || *regb == Reg::VStar) {
-                    panic!("Cannot change V value when reading *V");
+                    let report = miette!(
+                        labels = vec![
+                            LabeledSpan::at(spanc.clone(), "This"),
+                            LabeledSpan::at((spana.clone()).start..(spanb.clone().end), "and this are incompatible"),
+                        ],
+                        "Error Can't change V value when reading *V"
+                    );
+                    errors.push(report);
                 }
                 if *op == Op::Not {
-                    panic!("Too many operand for ~");
+                    let report = miette!(
+                        labels = vec![
+                            LabeledSpan::at(spana.clone(), "Excessive operand"),
+                            LabeledSpan::at(spanop.clone(), "with operation ~"),
+                        ],
+                        help = format!("Try removing {:?}", *rega),
+                        "Error Too many operand for ~"
+                    );
+                    errors.push(report);
                 }
                 i += 5;
                 adr += 16;
@@ -477,7 +499,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn test_wrong_double_operand_operation() {
         let src = "A = A ~ D";
 
@@ -485,11 +506,10 @@ mod tests {
 
         let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
 
-        generate_bit_stream(&mut tokens, false, false, "");
+        assert!(!generate_bit_stream(&mut tokens, false, false, "").2.is_empty());
     }
 
     #[test]
-    #[should_panic]
     fn test_incompatible_registers() {
         let src = "A = A + *A\nV = V + *V\nA = *A & D";
 
@@ -497,6 +517,6 @@ mod tests {
 
         let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
 
-        generate_bit_stream(&mut tokens, false, false, "");
+        assert!(!generate_bit_stream(&mut tokens, false, false, "").2.is_empty());
     }
 }
