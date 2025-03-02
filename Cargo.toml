@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+clap = { version = "4.5.31", features = ["derive"] }
 colored = "3.0.0"
 logos = { version = "0.15.0" }# , features = ["debug"] }
 miette = { version = "7.5.0", features = ["fancy"] }
@@ -16,4 +17,4 @@ pretty_assertions = "1"
 # this effectively enable the feature `no-color` of colored when testing with
 # `cargo test --feature dumb_terminal`
 dumb_terminal = ["colored/no-color"]
-default = ["dumb_terminal"]
+# default = ["dumb_terminal"]
