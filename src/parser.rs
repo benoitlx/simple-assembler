@@ -1,22 +1,9 @@
 use crate::lexer::spec::arch_v1::*;
 use crate::lexer::{Token::*, *};
 use colored::Colorize;
-use miette::{miette, LabeledSpan, Error};
+use miette::{miette, Error, LabeledSpan};
 use std::collections::HashMap;
 use std::ops::Range;
-
-/*
-TODO:
-- pour chaque panic donner les bonnes infos l'endroit du token fautif ...
-
-Futur:
-- Error handling with miette
-- cli
-*/
-
-fn data_mode_format(val: u16) -> String {
-    format!("{}{}", "1".green(), format!("{:015b}", val).red())
-}
 
 trait BitStream {
     fn bit_stream(&self) -> String;
@@ -36,6 +23,12 @@ impl BitStream for OpOrCond {
     }
 }
 
+/// takes a 15 bits value and format it in a recognizable word for the cpu
+fn data_mode_format(val: u16) -> String {
+    format!("{}{}", "1".green(), format!("{:015b}", val).red())
+}
+
+/// takes operands operation and destination register and format it in a recognizable word for the cpu
 fn inst_mode_format(op_or_cond: OpOrCond, rega: Reg, regb: Reg, regc: Reg) -> String {
     format!(
         "{}{}000{}{}{}",
@@ -47,6 +40,7 @@ fn inst_mode_format(op_or_cond: OpOrCond, rega: Reg, regb: Reg, regc: Reg) -> St
     )
 }
 
+/// generate a bit stream from a Vec of Spanned Token
 pub fn generate_bit_stream(
     tokens: &mut Vec<(Result<Token, ()>, Range<usize>)>,
     colorize: bool,
@@ -85,7 +79,10 @@ pub fn generate_bit_stream(
                     let report = miette!(
                         labels = vec![
                             LabeledSpan::at(spanc.clone(), "This"),
-                            LabeledSpan::at((spana.clone()).start..(spanb.clone().end), "and this are incompatible"),
+                            LabeledSpan::at(
+                                (spana.clone()).start..(spanb.clone().end),
+                                "and this are incompatible"
+                            ),
                         ],
                         "Error Can't change A value when reading *A"
                     );
@@ -95,7 +92,10 @@ pub fn generate_bit_stream(
                     let report = miette!(
                         labels = vec![
                             LabeledSpan::at(spanc.clone(), "This"),
-                            LabeledSpan::at((spana.clone()).start..(spanb.clone().end), "and this are incompatible"),
+                            LabeledSpan::at(
+                                (spana.clone()).start..(spanb.clone().end),
+                                "and this are incompatible"
+                            ),
                         ],
                         "Error Can't change V value when reading *V"
                     );
@@ -117,12 +117,11 @@ pub fn generate_bit_stream(
                 inst_mode_format(OpOrCond::Operation(*op), *rega, *regb, *regc)
             }
             // A <- mask, tested
-            [(Ok(Register(regc)), span), (Ok(Assignement), _), (Ok(Identifier(id)), _), _, _] => {
+            [(Ok(Register(regc)), span), (Ok(Assignement), _), (Ok(Identifier(id)), spanid), _, _] =>
+            {
                 if *regc != Reg::A {
                     let report = miette!(
-                        labels = vec![
-                            LabeledSpan::at(span.clone(), "This should be A")
-                        ],
+                        labels = vec![LabeledSpan::at(span.clone(), "This should be A")],
                         help = format!("Consider using this: \nA = {id}\n{:?} = A", *regc),
                         "Error Can't push direct value into other register than A"
                     );
@@ -131,15 +130,13 @@ pub fn generate_bit_stream(
 
                 i += 3;
                 adr += 16;
-                id.clone()
+                format!("{}#{}#{}#", id, spanid.start, spanid.end)
             }
             // A <- 0x7fff, tested
             [(Ok(Register(regc)), span), (Ok(Assignement), _), (Ok(Value(val)), _), _, _] => {
                 if *regc != Reg::A {
                     let report = miette!(
-                        labels = vec![
-                            LabeledSpan::at(span.clone(), "This should be A")
-                        ],
+                        labels = vec![LabeledSpan::at(span.clone(), "This should be A")],
                         help = format!("Consider using this: \nA = {val}\n{:?} = A", *regc),
                         "Error Can't push direct value into other register than A"
                     );
@@ -151,7 +148,8 @@ pub fn generate_bit_stream(
                 data_mode_format(*val)
             }
             // A <- D, tested
-            [(Ok(Register(regc)), spanc), (Ok(Assignement), _), (Ok(Register(rega)), spana), _, _] => {
+            [(Ok(Register(regc)), spanc), (Ok(Assignement), _), (Ok(Register(rega)), spana), _, _] =>
+            {
                 if *regc == Reg::A && *rega == Reg::AStar {
                     let report = miette!(
                         labels = vec![
@@ -262,22 +260,42 @@ pub fn generate_bit_stream(
         println!("{:.?}", id_collect);
     }
 
-    fn handle_id(id: String, col: &mut HashMap<String, (u16, Range<usize>)>) -> String {
-        if id.chars().all(|c| c.is_alphabetic() || c == '_') {
-            return if let Some(value) = col.get(&id) {
+    fn handle_id(
+        word: String,
+        col: &mut HashMap<String, (u16, Range<usize>)>,
+        errs: &mut Vec<Error>,
+    ) -> String {
+        if word.chars().last().unwrap() == '#' {
+            let mut splited_word = word.split("#");
+            let id = splited_word.next().unwrap();
+            let start: usize = splited_word
+                .next()
+                .expect("unable to parse span")
+                .parse()
+                .unwrap();
+            let end: usize = splited_word
+                .next()
+                .expect("unable to parse span")
+                .parse()
+                .unwrap();
+            return if let Some(value) = col.get(id) {
                 data_mode_format(value.0)
             } else {
-                "Error".to_string()
-                // todo return a proper error and where it happened
+                let report = miette!(
+                    labels = vec![LabeledSpan::at(start..end, "unknown id"),],
+                    "Error: Unrecognized identifier {id}"
+                );
+                errs.push(report);
+                "E".to_string()
             };
         }
 
-        id
+        word
     }
 
     let bit_stream: Vec<String> = bit_stream_with_id
         .into_iter()
-        .map(|s| handle_id(s, &mut id_collect))
+        .map(|s| handle_id(s, &mut id_collect, &mut errors))
         .collect();
 
     (bit_stream.join(sep), id_collect, errors)
@@ -373,7 +391,9 @@ mod tests {
         let lex = Token::lexer(src);
 
         let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
-        assert!(!generate_bit_stream(&mut tokens, false, false, "").2.is_empty());
+        assert!(!generate_bit_stream(&mut tokens, false, false, "")
+            .2
+            .is_empty());
     }
 
     #[test]
@@ -403,7 +423,9 @@ mod tests {
         let lex = Token::lexer(src);
 
         let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
-        assert!(!generate_bit_stream(&mut tokens, false, false, "").2.is_empty())
+        assert!(!generate_bit_stream(&mut tokens, false, false, "")
+            .2
+            .is_empty())
     }
 
     #[test]
@@ -506,7 +528,9 @@ mod tests {
 
         let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
 
-        assert!(!generate_bit_stream(&mut tokens, false, false, "").2.is_empty());
+        assert!(!generate_bit_stream(&mut tokens, false, false, "")
+            .2
+            .is_empty());
     }
 
     #[test]
@@ -517,6 +541,8 @@ mod tests {
 
         let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
 
-        assert!(!generate_bit_stream(&mut tokens, false, false, "").2.is_empty());
+        assert!(!generate_bit_stream(&mut tokens, false, false, "")
+            .2
+            .is_empty());
     }
 }
