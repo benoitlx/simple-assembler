@@ -217,10 +217,14 @@ pub fn generate_bit_stream(
                     id_collect.insert(id.clone(), (adr, span.clone()));
                 } else {
                     let other_span = (*id_ref.unwrap()).1.clone();
-                    panic!(
-                        "identifier already used there {}..{}",
-                        other_span.start, other_span.end
+                    let report = miette!(
+                        labels = vec![
+                            LabeledSpan::at(other_span, "previously declared here"),
+                            LabeledSpan::at(span.clone(), "declared there"),
+                        ],
+                        "Error: Identifier already declared"
                     );
+                    errors.push(report);
                 }
 
                 String::new()
@@ -236,10 +240,14 @@ pub fn generate_bit_stream(
                     id_collect.insert(id.clone(), (*val, span.clone()));
                 } else {
                     let other_span = (*id_ref.unwrap()).1.clone();
-                    panic!(
-                        "identifier already used there {}..{}",
-                        other_span.start, other_span.end
+                    let report = miette!(
+                        labels = vec![
+                            LabeledSpan::at(other_span, "previously declared here"),
+                            LabeledSpan::at(span.clone(), "declared there"),
+                        ],
+                        "Error: Identifier already declared"
                     );
+                    errors.push(report);
                 }
 
                 String::new()
