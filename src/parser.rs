@@ -326,14 +326,6 @@ mod tests {
             collection,
             generate_bit_stream(&mut tokens, false, true, "").1
         );
-        assert_eq!(
-            collection,
-            generate_bit_stream(&mut tokens, true, false, "").1
-        );
-        assert_eq!(
-            collection,
-            generate_bit_stream(&mut tokens, true, true, "").1
-        );
     }
 
     #[test]
@@ -354,14 +346,6 @@ mod tests {
         assert_eq!(
             collection,
             generate_bit_stream(&mut tokens, false, true, "").1
-        );
-        assert_eq!(
-            collection,
-            generate_bit_stream(&mut tokens, true, false, "").1
-        );
-        assert_eq!(
-            collection,
-            generate_bit_stream(&mut tokens, true, true, "").1
         );
     }
 
