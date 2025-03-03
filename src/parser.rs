@@ -1,10 +1,11 @@
 use crate::lexer::spec::arch_v1::*;
 use crate::lexer::{Token::*, *};
 use colored::Colorize;
-use miette::{miette, Error, LabeledSpan};
+use miette::{miette, Error, LabeledSpan, Severity};
 use std::collections::HashMap;
 use std::ops::Range;
 
+/* This should be placed in spec ======================================== */
 trait BitStream {
     fn bit_stream(&self) -> String;
 }
@@ -39,6 +40,21 @@ fn inst_mode_format(op_or_cond: OpOrCond, rega: Reg, regb: Reg, regc: Reg) -> St
         regc.bit_stream().cyan()
     )
 }
+/* ============================================================= */
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct ColType {
+    val: u16,
+    span: Range<usize>,
+    visited: bool,
+}
+
+// TODO
+pub struct ParserReport {
+    bit_stream: String,
+    errors: Vec<Error>,
+    id_collect: HashMap<String, ColType>,
+}
 
 /// generate a bit stream from a Vec of Spanned Token
 pub fn generate_bit_stream(
@@ -46,14 +62,14 @@ pub fn generate_bit_stream(
     colorize: bool,
     debug: bool,
     sep: &str,
-) -> (String, HashMap<String, (u16, Range<usize>)>, Vec<Error>) {
+) -> (String, HashMap<String, ColType>, Vec<Error>) {
     colored::control::set_override(colorize);
     let mut bit_stream_with_id: Vec<String> = vec![];
 
     let mut errors: Vec<Error> = vec![];
 
     // Hashmap for the identifiers
-    let mut id_collect: HashMap<String, (u16, Range<usize>)> = HashMap::new();
+    let mut id_collect: HashMap<String, ColType> = HashMap::new();
     let mut adr = 0;
 
     let mut i = 0;
@@ -214,9 +230,9 @@ pub fn generate_bit_stream(
                 let id_ref = id_collect.get(id);
 
                 if id_ref == None {
-                    id_collect.insert(id.clone(), (adr, span.clone()));
+                    id_collect.insert(id.clone(), ColType {val: adr, span: span.clone(), visited: false});
                 } else {
-                    let other_span = (*id_ref.unwrap()).1.clone();
+                    let other_span = (*id_ref.unwrap()).span.clone();
                     let report = miette!(
                         labels = vec![
                             LabeledSpan::at(other_span, "previously declared here"),
@@ -237,9 +253,9 @@ pub fn generate_bit_stream(
                 let id_ref = id_collect.get(id);
 
                 if id_ref == None {
-                    id_collect.insert(id.clone(), (*val, span.clone()));
+                    id_collect.insert(id.clone(), ColType {val: *val, span: span.clone(), visited: false});
                 } else {
-                    let other_span = (*id_ref.unwrap()).1.clone();
+                    let other_span = (*id_ref.unwrap()).span.clone();
                     let report = miette!(
                         labels = vec![
                             LabeledSpan::at(other_span, "previously declared here"),
@@ -270,7 +286,7 @@ pub fn generate_bit_stream(
 
     fn handle_id(
         word: String,
-        col: &mut HashMap<String, (u16, Range<usize>)>,
+        col: &mut HashMap<String, ColType>,
         errs: &mut Vec<Error>,
     ) -> String {
         if word.chars().last().unwrap() == '#' {
@@ -286,8 +302,9 @@ pub fn generate_bit_stream(
                 .expect("unable to parse span")
                 .parse()
                 .unwrap();
-            return if let Some(value) = col.get(id) {
-                data_mode_format(value.0)
+            return if let Some(context) = col.get_mut(id) {
+                context.visited = true;
+                data_mode_format(context.val)
             } else {
                 let report = miette!(
                     labels = vec![LabeledSpan::at(start..end, "unknown id"),],
@@ -306,6 +323,20 @@ pub fn generate_bit_stream(
         .map(|s| handle_id(s, &mut id_collect, &mut errors))
         .collect();
 
+    for (key, context) in id_collect.clone() {
+        match context {
+            ColType {val: _, span, visited: false} => {
+                let report = miette!(
+                    severity = Severity::Warning,
+                    labels = vec![LabeledSpan::at(span, "Here"),],
+                    "Error: {key} declared but never used"
+                );
+                errors.push(report);
+            }
+            _ => ()
+        }
+    }
+
     (bit_stream.join(sep), id_collect, errors)
 }
 
@@ -317,11 +348,11 @@ mod tests {
     #[test]
     fn test_define() {
         let src = "DEFINE foo 0\nDEFINE bar 1\nDEFINE titi 42\nDEFINE tata 73";
-        let mut collection: HashMap<String, (u16, Range<usize>)> = HashMap::new();
-        collection.insert("foo".to_string(), (0, 7..10));
-        collection.insert("bar".to_string(), (1, 20..23));
-        collection.insert("titi".to_string(), (42, 33..37));
-        collection.insert("tata".to_string(), (73, 48..52));
+        let mut collection: HashMap<String, ColType> = HashMap::new();
+        collection.insert("foo".to_string(), ColType {val: 0, span: 7..10, visited: false});
+        collection.insert("bar".to_string(), ColType {val: 1, span: 20..23, visited: false});
+        collection.insert("titi".to_string(), ColType {val: 42, span: 33..37, visited: false});
+        collection.insert("tata".to_string(), ColType {val: 73, span: 48..52, visited: false});
 
         let lex = Token::lexer(src);
 
@@ -339,10 +370,10 @@ mod tests {
     #[test]
     fn test_label() {
         let src = "main:\nJMP\nlabel:\nJMP\nJMP\nJMP\nJMP\nJMP\nJMP\nJMP\nJMP\ntiti:";
-        let mut collection: HashMap<String, (u16, Range<usize>)> = HashMap::new();
-        collection.insert("main".to_string(), (0, 0..4));
-        collection.insert("label".to_string(), (16, 10..15));
-        collection.insert("titi".to_string(), (144, 49..53));
+        let mut collection: HashMap<String, ColType> = HashMap::new();
+        collection.insert("main".to_string(), ColType {val: 0, span: 0..4, visited: false});
+        collection.insert("label".to_string(), ColType {val: 16, span: 10..15, visited: false});
+        collection.insert("titi".to_string(), ColType {val: 144, span: 49..53, visited: false});
 
         let lex = Token::lexer(src);
 

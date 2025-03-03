@@ -5,6 +5,7 @@ use clap::Parser;
 use colored::Colorize;
 use lexer::Token;
 use logos::Logos;
+use miette::Severity;
 
 /// Simple cli to parse and generate bit stream for my custom assembly language
 #[derive(Parser)]
@@ -23,6 +24,14 @@ struct Cli {
     /// separator between each words in the bit stream
     #[arg(short = 's', long = "sep", default_value_t = String::from(""))]
     sep: String,
+
+    /// whether to turn off warnings 
+    #[arg(long = "w-off")]
+    warning_off: bool,
+
+    /// whether to output the bit stream if warnings are encountered
+    #[arg(short = 'W', long = "Warn")]
+    warning: bool,
 }
 
 fn main() {
@@ -38,16 +47,32 @@ fn main() {
 
         let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
 
-        let (bit_stream, _, errors) =
+        let (bit_stream, _, report) =
             parser::generate_bit_stream(&mut tokens, args.color, args.debug, &args.sep);
 
+        let (errors, warnings): (Vec<_>, Vec<_>)= report.into_iter().partition(|r| r.severity() != Some(Severity::Warning));
+
         let error_number = errors.len();
+        let warning_number = warnings.len();
+
+        if warning_number > 0 && !args.warning_off {
+            for w in warnings {
+                println!("{:?}", w.with_source_code(content.clone()));
+            }
+        }
+
         if error_number > 0 {
             for e in errors {
                 println!("{:?}", e.with_source_code(content.clone()));
             }
 
-            println!("{} errors found in {}", error_number, args.file_path);
+            println!("{} errors and {} warnings found in {}, exiting !", error_number, warning_number, args.file_path);
+            return;
+        }
+
+        if warning_number > 0 && !args.warning {
+            println!("{} warnings encountered, exiting !", warning_number);
+
             return;
         }
 
