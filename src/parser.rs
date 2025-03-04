@@ -51,18 +51,18 @@ pub struct ColType {
 
 // TODO
 pub struct ParserReport {
-    bit_stream: String,
-    errors: Vec<Error>,
+    pub bit_stream: String,
+    pub report: Vec<Error>,
     id_collect: HashMap<String, ColType>,
 }
 
 /// generate a bit stream from a Vec of Spanned Token
-pub fn generate_bit_stream(
+pub fn parse(
     tokens: &mut Vec<(Result<Token, ()>, Range<usize>)>,
     colorize: bool,
     debug: bool,
     sep: &str,
-) -> (String, HashMap<String, ColType>, Vec<Error>) {
+) -> ParserReport {
     colored::control::set_override(colorize);
     let mut bit_stream_with_id: Vec<String> = vec![];
 
@@ -230,7 +230,14 @@ pub fn generate_bit_stream(
                 let id_ref = id_collect.get(id);
 
                 if id_ref == None {
-                    id_collect.insert(id.clone(), ColType {val: adr, span: span.clone(), visited: false});
+                    id_collect.insert(
+                        id.clone(),
+                        ColType {
+                            val: adr,
+                            span: span.clone(),
+                            visited: false,
+                        },
+                    );
                 } else {
                     let other_span = (*id_ref.unwrap()).span.clone();
                     let report = miette!(
@@ -253,7 +260,14 @@ pub fn generate_bit_stream(
                 let id_ref = id_collect.get(id);
 
                 if id_ref == None {
-                    id_collect.insert(id.clone(), ColType {val: *val, span: span.clone(), visited: false});
+                    id_collect.insert(
+                        id.clone(),
+                        ColType {
+                            val: *val,
+                            span: span.clone(),
+                            visited: false,
+                        },
+                    );
                 } else {
                     let other_span = (*id_ref.unwrap()).span.clone();
                     let report = miette!(
@@ -325,7 +339,11 @@ pub fn generate_bit_stream(
 
     for (key, context) in id_collect.clone() {
         match context {
-            ColType {val: _, span, visited: false} => {
+            ColType {
+                val: _,
+                span,
+                visited: false,
+            } => {
                 let report = miette!(
                     severity = Severity::Warning,
                     labels = vec![LabeledSpan::at(span, "Here"),],
@@ -333,11 +351,15 @@ pub fn generate_bit_stream(
                 );
                 errors.push(report);
             }
-            _ => ()
+            _ => (),
         }
     }
 
-    (bit_stream.join(sep), id_collect, errors)
+    ParserReport {
+        bit_stream: bit_stream.join(sep),
+        report: errors,
+        id_collect: id_collect,
+    }
 }
 
 #[cfg(test)]
@@ -349,21 +371,49 @@ mod tests {
     fn test_define() {
         let src = "DEFINE foo 0\nDEFINE bar 1\nDEFINE titi 42\nDEFINE tata 73";
         let mut collection: HashMap<String, ColType> = HashMap::new();
-        collection.insert("foo".to_string(), ColType {val: 0, span: 7..10, visited: false});
-        collection.insert("bar".to_string(), ColType {val: 1, span: 20..23, visited: false});
-        collection.insert("titi".to_string(), ColType {val: 42, span: 33..37, visited: false});
-        collection.insert("tata".to_string(), ColType {val: 73, span: 48..52, visited: false});
+        collection.insert(
+            "foo".to_string(),
+            ColType {
+                val: 0,
+                span: 7..10,
+                visited: false,
+            },
+        );
+        collection.insert(
+            "bar".to_string(),
+            ColType {
+                val: 1,
+                span: 20..23,
+                visited: false,
+            },
+        );
+        collection.insert(
+            "titi".to_string(),
+            ColType {
+                val: 42,
+                span: 33..37,
+                visited: false,
+            },
+        );
+        collection.insert(
+            "tata".to_string(),
+            ColType {
+                val: 73,
+                span: 48..52,
+                visited: false,
+            },
+        );
 
         let lex = Token::lexer(src);
 
         let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
         assert_eq!(
             collection,
-            generate_bit_stream(&mut tokens, false, false, "").1
+            parse(&mut tokens, false, false, "").id_collect
         );
         assert_eq!(
             collection,
-            generate_bit_stream(&mut tokens, false, true, "").1
+            parse(&mut tokens, false, true, "").id_collect
         );
     }
 
@@ -371,20 +421,41 @@ mod tests {
     fn test_label() {
         let src = "main:\nJMP\nlabel:\nJMP\nJMP\nJMP\nJMP\nJMP\nJMP\nJMP\nJMP\ntiti:";
         let mut collection: HashMap<String, ColType> = HashMap::new();
-        collection.insert("main".to_string(), ColType {val: 0, span: 0..4, visited: false});
-        collection.insert("label".to_string(), ColType {val: 16, span: 10..15, visited: false});
-        collection.insert("titi".to_string(), ColType {val: 144, span: 49..53, visited: false});
+        collection.insert(
+            "main".to_string(),
+            ColType {
+                val: 0,
+                span: 0..4,
+                visited: false,
+            },
+        );
+        collection.insert(
+            "label".to_string(),
+            ColType {
+                val: 16,
+                span: 10..15,
+                visited: false,
+            },
+        );
+        collection.insert(
+            "titi".to_string(),
+            ColType {
+                val: 144,
+                span: 49..53,
+                visited: false,
+            },
+        );
 
         let lex = Token::lexer(src);
 
         let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
         assert_eq!(
             collection,
-            generate_bit_stream(&mut tokens, false, false, "").1
+            parse(&mut tokens, false, false, "").id_collect
         );
         assert_eq!(
             collection,
-            generate_bit_stream(&mut tokens, false, true, "").1
+            parse(&mut tokens, false, true, "").id_collect
         );
     }
 
@@ -399,11 +470,11 @@ mod tests {
 
         assert_eq!(
             expected,
-            generate_bit_stream(&mut tokens, false, false, "\n").0
+            parse(&mut tokens, false, false, "\n").bit_stream
         );
         assert_eq!(
             expected,
-            generate_bit_stream(&mut tokens, false, true, "\n").0
+            parse(&mut tokens, false, true, "\n").bit_stream
         );
     }
 
@@ -414,8 +485,8 @@ mod tests {
         let lex = Token::lexer(src);
 
         let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
-        assert!(!generate_bit_stream(&mut tokens, false, false, "")
-            .2
+        assert!(!parse(&mut tokens, false, false, "")
+            .report
             .is_empty());
     }
 
@@ -431,11 +502,11 @@ mod tests {
 
         assert_eq!(
             expected,
-            generate_bit_stream(&mut tokens, false, false, "\n").0
+            parse(&mut tokens, false, false, "\n").bit_stream
         );
         assert_eq!(
             expected,
-            generate_bit_stream(&mut tokens, false, true, "\n").0
+            parse(&mut tokens, false, true, "\n").bit_stream
         );
     }
 
@@ -446,8 +517,8 @@ mod tests {
         let lex = Token::lexer(src);
 
         let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
-        assert!(!generate_bit_stream(&mut tokens, false, false, "")
-            .2
+        assert!(!parse(&mut tokens, false, false, "")
+            .report
             .is_empty())
     }
 
@@ -463,11 +534,11 @@ mod tests {
 
         assert_eq!(
             expected,
-            generate_bit_stream(&mut tokens, false, false, "\n").0
+            parse(&mut tokens, false, false, "\n").bit_stream
         );
         assert_eq!(
             expected,
-            generate_bit_stream(&mut tokens, false, true, "\n").0
+            parse(&mut tokens, false, true, "\n").bit_stream
         );
     }
 
@@ -483,11 +554,11 @@ mod tests {
 
         assert_eq!(
             expected,
-            generate_bit_stream(&mut tokens, false, false, "\n").0
+            parse(&mut tokens, false, false, "\n").bit_stream
         );
         assert_eq!(
             expected,
-            generate_bit_stream(&mut tokens, false, true, "\n").0
+            parse(&mut tokens, false, true, "\n").bit_stream
         );
     }
 
@@ -503,11 +574,11 @@ mod tests {
 
         assert_eq!(
             expected,
-            generate_bit_stream(&mut tokens, false, false, "\n").0
+            parse(&mut tokens, false, false, "\n").bit_stream
         );
         assert_eq!(
             expected,
-            generate_bit_stream(&mut tokens, false, true, "\n").0
+            parse(&mut tokens, false, true, "\n").bit_stream
         );
     }
 
@@ -520,7 +591,7 @@ mod tests {
 
         let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
 
-        generate_bit_stream(&mut tokens, false, false, "");
+        parse(&mut tokens, false, false, "");
     }
 
     #[test]
@@ -535,11 +606,11 @@ mod tests {
 
         assert_eq!(
             expected,
-            generate_bit_stream(&mut tokens, false, false, "\n").0
+            parse(&mut tokens, false, false, "\n").bit_stream
         );
         assert_eq!(
             expected,
-            generate_bit_stream(&mut tokens, false, true, "\n").0
+            parse(&mut tokens, false, true, "\n").bit_stream
         );
     }
 
@@ -551,8 +622,8 @@ mod tests {
 
         let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
 
-        assert!(!generate_bit_stream(&mut tokens, false, false, "")
-            .2
+        assert!(!parse(&mut tokens, false, false, "")
+            .report
             .is_empty());
     }
 
@@ -564,8 +635,8 @@ mod tests {
 
         let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
 
-        assert!(!generate_bit_stream(&mut tokens, false, false, "")
-            .2
+        assert!(!parse(&mut tokens, false, false, "")
+            .report
             .is_empty());
     }
 }

@@ -25,7 +25,7 @@ struct Cli {
     #[arg(short = 's', long = "sep", default_value_t = String::from(""))]
     sep: String,
 
-    /// whether to turn off warnings 
+    /// whether to turn off warnings
     #[arg(long = "w-off")]
     warning_off: bool,
 
@@ -47,10 +47,13 @@ fn main() {
 
         let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
 
-        let (bit_stream, _, report) =
-            parser::generate_bit_stream(&mut tokens, args.color, args.debug, &args.sep);
+        let parser_report =
+            parser::parse(&mut tokens, args.color, args.debug, &args.sep);
 
-        let (errors, warnings): (Vec<_>, Vec<_>)= report.into_iter().partition(|r| r.severity() != Some(Severity::Warning));
+        let (errors, warnings): (Vec<_>, Vec<_>) = parser_report
+            .report
+            .into_iter()
+            .partition(|r| r.severity() != Some(Severity::Warning));
 
         let error_number = errors.len();
         let warning_number = warnings.len();
@@ -66,7 +69,10 @@ fn main() {
                 println!("{:?}", e.with_source_code(content.clone()));
             }
 
-            println!("{} errors and {} warnings found in {}, exiting !", error_number, warning_number, args.file_path);
+            println!(
+                "{} errors and {} warnings found in {}, exiting !",
+                error_number, warning_number, args.file_path
+            );
             return;
         }
 
@@ -88,6 +94,6 @@ fn main() {
             );
         }
 
-        println!("{}", bit_stream);
+        println!("{}", parser_report.bit_stream);
     }
 }
