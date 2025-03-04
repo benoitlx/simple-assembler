@@ -49,10 +49,12 @@ pub struct ColType {
     visited: bool,
 }
 
-// TODO
 pub struct ParserReport {
     pub bit_stream: String,
     pub report: Vec<Error>,
+
+    // this field is only used for test purpose
+    #[allow(dead_code)]
     id_collect: HashMap<String, ColType>,
 }
 
