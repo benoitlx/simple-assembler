@@ -1,6 +1,7 @@
 pub mod arch_v1 {
     use crate::lexer::HandleToken;
     use logos::Lexer;
+    use colored::Colorize;
 
     #[allow(dead_code)]
 
@@ -120,5 +121,47 @@ pub mod arch_v1 {
             }
             .to_string()
         }
+    }
+
+
+    // wrapper around Op and Cond
+    #[allow(dead_code)]
+    pub enum OpOrCond {
+        Operation(Op),
+        Condition(Cond),
+    }
+
+    impl HandleToken for OpOrCond {
+        fn new(_lex: &mut Lexer<crate::lexer::Token>) -> Option<Self>
+            where
+                Self: Sized {
+            None
+        } 
+
+        fn bit_stream(&self) -> String {
+            match self {
+                OpOrCond::Operation(op) => op.bit_stream(),
+                OpOrCond::Condition(cond) => cond.bit_stream(),
+            }
+        }
+    }
+
+    /// takes a 15 bits value and format it in a recognizable word for the cpu
+    #[allow(dead_code)]
+    pub fn data_mode_format(val: u16) -> String {
+        format!("{}{}", "1".green(), format!("{:015b}", val).red())
+    }
+
+    /// takes operands operation and destination register and format it in a recognizable word for the cpu
+    #[allow(dead_code)]
+    pub fn inst_mode_format(op_or_cond: OpOrCond, rega: Reg, regb: Reg, regc: Reg) -> String {
+        format!(
+            "{}{}000{}{}{}",
+            "0".green().bold(),
+            op_or_cond.bit_stream().blue(),
+            rega.bit_stream().yellow(),
+            regb.bit_stream().purple(),
+            regc.bit_stream().cyan()
+        )
     }
 }

@@ -1,46 +1,8 @@
 use crate::lexer::spec::arch_v1::*;
 use crate::lexer::{Token::*, *};
-use colored::Colorize;
 use miette::{miette, Error, LabeledSpan, Severity};
 use std::collections::HashMap;
 use std::ops::Range;
-
-/* This should be placed in spec ======================================== */
-trait BitStream {
-    fn bit_stream(&self) -> String;
-}
-
-enum OpOrCond {
-    Operation(Op),
-    Condition(Cond),
-}
-
-impl BitStream for OpOrCond {
-    fn bit_stream(&self) -> String {
-        match self {
-            OpOrCond::Operation(op) => op.bit_stream(),
-            OpOrCond::Condition(cond) => cond.bit_stream(),
-        }
-    }
-}
-
-/// takes a 15 bits value and format it in a recognizable word for the cpu
-fn data_mode_format(val: u16) -> String {
-    format!("{}{}", "1".green(), format!("{:015b}", val).red())
-}
-
-/// takes operands operation and destination register and format it in a recognizable word for the cpu
-fn inst_mode_format(op_or_cond: OpOrCond, rega: Reg, regb: Reg, regc: Reg) -> String {
-    format!(
-        "{}{}000{}{}{}",
-        "0".green().bold(),
-        op_or_cond.bit_stream().blue(),
-        rega.bit_stream().yellow(),
-        regb.bit_stream().purple(),
-        regc.bit_stream().cyan()
-    )
-}
-/* ============================================================= */
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct ColType {
