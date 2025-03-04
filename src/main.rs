@@ -1,6 +1,8 @@
 mod lexer;
 mod parser;
 
+use std::fs::File;
+
 use clap::Parser;
 use colored::Colorize;
 use lexer::Token;
@@ -32,10 +34,15 @@ struct Cli {
     /// whether to output the bit stream if warnings are encountered
     #[arg(short = 'W', long = "Warn")]
     warning: bool,
+
+    /// save output in designated file
+    #[arg(short = 'o', long = "output")]
+    output_path: Option<String>,
 }
 
 fn main() {
     use std::io::Read;
+    use std::io::Write;
 
     let args = Cli::parse();
 
@@ -47,8 +54,7 @@ fn main() {
 
         let mut tokens: Vec<(Result<Token, ()>, std::ops::Range<usize>)> = lex.spanned().collect();
 
-        let parser_report =
-            parser::parse(&mut tokens, args.color, args.debug, &args.sep);
+        let parser_report = parser::parse(&mut tokens, args.color, args.debug, &args.sep);
 
         let (errors, warnings): (Vec<_>, Vec<_>) = parser_report
             .report
@@ -94,6 +100,11 @@ fn main() {
             );
         }
 
-        println!("{}", parser_report.bit_stream);
+        if let Some(path) = args.output_path {
+            let mut output = File::create(path).unwrap();
+            let _ = write!(output, "{}", parser_report.bit_stream);
+        } else {
+            println!("{}", parser_report.bit_stream);
+        }
     }
 }
