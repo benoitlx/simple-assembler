@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: write  # Required to create releases
+
 env: 
   CARGO_TERM_COLOR: always
 
