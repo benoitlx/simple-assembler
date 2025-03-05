@@ -45,13 +45,9 @@ jobs:
           name: simple-assembler 
           path: .
 
-      - name: Create source ZIP
-        run: zip -r source-code.zip .
-
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             ./simple-assembler
-            ./source-code.zip
   
